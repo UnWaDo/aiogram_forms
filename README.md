@@ -49,7 +49,7 @@ Available fields are:
 - `StaticChoiceField` (i): select from predefined options
 - `DynamicChoiceField` (i): select from list of options with predefined options
 - `ToggleField` (c): toggle button (alternates between `True` and `False`)
-- `ToggleManyField`` (c): toggle button with multiple options (specified in `options` parameter)
+- `ToggleManyField` (c): toggle button with multiple options (specified in `options` parameter)
 - `SubmitField` (c): submit button
 
 All values from fields are stored in `form_data` dictionary, which is passed to handlers of the fields. You can define your own fields.
@@ -61,7 +61,7 @@ When field is opened to a user, it will show message defined by `prompt_formatte
 - whole form data with `FormDataFormatter` (helpful for debugging)
 - template based on form_data with `JinjaFormatter`
 
-It is possible to make field visible only when some condition is met. This can be done by specifing `visible` parameter when constructing a field.
+It is possible to make field visible only when some condition is met. This can be done by specifying `visible` parameter when constructing a field.
 
 - `RequiredFieldsVisible` - field is visible only when some required fields are filled (not that their presence in `form_data` is evaluated, not their value)
 - `RequireValueVisible` - field is visible only when some value is `True` (or you can specify another function to check this value)
