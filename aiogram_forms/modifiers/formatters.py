@@ -23,13 +23,14 @@ class FixedTextFormatter(MessageFormatter):
 class ConditionalMessageFormatter(MessageFormatter):
     value_name: str
     options: dict[Hashable, str]
+    default_text: str = _("😢 Text is missing")
 
     async def __call__(self, form_data: dict[str, Any]) -> str:
         value = form_data.get(self.value_name)
         if value is None:
-            return _("😢 Text is missing")
+            return self.default_text
 
-        return self.options.get(value, _("😢 Text is missing"))
+        return self.options.get(value, self.default_text)
 
 
 class FormDataFormatter(MessageFormatter):
