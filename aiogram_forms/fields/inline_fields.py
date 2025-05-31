@@ -1,3 +1,4 @@
+from abc import abstractmethod
 import dataclasses
 from typing import Any, Callable, Mapping, Protocol, Sequence, TypeVar
 
@@ -12,23 +13,33 @@ from aiogram_forms.callbacks.factories import FormChoiceFieldCallback, FormPageC
 from aiogram_forms.fields.abstract_fields import InlineReplyField
 from aiogram_forms.utils import edit_message
 
+T = TypeVar("T")
+K = TypeVar("K", default=str)
+
 
 @dataclasses.dataclass
-class ChoiceField(InlineReplyField):
+class ChoiceField[T, K](InlineReplyField):
     max_options: int = 1
     page_limit: int = 5
 
-    option_type: type[Any] = str
+    option_to_button: Callable[[T], str] = dataclasses.field(kw_only=True)
+    option_to_data: Callable[[T], K] = dataclasses.field(kw_only=True)
+    option_data_type: Callable[[str], K] = dataclasses.field(
+        kw_only=True, default=str  # type: ignore
+    )
 
     def add_objects_keyboard(
         self,
         builder: InlineKeyboardBuilder,
-        options: Mapping[Any, str],
-        selected: Sequence[Any],
+        options: Sequence[T],
+        selected: Sequence[K],
         page: int,
     ):
-        for value, text in options.items():
-            prefix = "✅ " if (value in selected) else ""
+        for option in options:
+            value = self.option_to_data(option)
+            text = self.option_to_button(option)
+
+            prefix = "✅ " if (option in selected) else ""
 
             builder.button(
                 text=f"{prefix}{text}",
@@ -59,8 +70,8 @@ class ChoiceField(InlineReplyField):
         if not isinstance(callback_data, FormChoiceFieldCallback):
             raise ValueError("callback_data is not FormChoiceFieldCallback")
 
-        new_value = self.option_type(callback_data.data)
-        selected: list[str] | None = form_data.get(self.name)
+        new_value = self.option_data_type(callback_data.data)
+        selected: list[K] | None = form_data.get(self.name)
 
         if selected is None:
             selected = [new_value]
@@ -114,38 +125,56 @@ class ChoiceField(InlineReplyField):
             FormChoiceFieldCallback.filter(F.field_name == self.name),
         )
 
-
-@dataclasses.dataclass
-class StaticChoiceField(ChoiceField):
-    choices: dict[str, str] = dataclasses.field(kw_only=True)
-
-    _names: list[str] = dataclasses.field(init=False)
-
-    def __post_init__(self):
-        self._names = list(self.choices.keys())
-
     async def inline_markup(
         self, form_data: dict[str, Any], page: int = 0
     ) -> InlineKeyboardMarkup:
         builder = InlineKeyboardBuilder()
 
-        selected: list[str] | None = form_data.get(self.name)
+        selected: list[K] | None = form_data.get(self.name)
         if selected is None:
             selected = []
 
-        page_names = self._names[
-            page * self.page_limit : (page + 1) * self.page_limit + 1
-        ]
-        is_last_page = len(page_names) < self.page_limit + 1
-        page_names = page_names[: self.page_limit]
-        page_items = {k: v for k, v in self.choices.items() if k in page_names}
+        page_options = await self.load_options(
+            form_data,
+            page=page,
+            limit=self.page_limit + 1,
+        )
 
-        self.add_objects_keyboard(builder, page_items, selected, page=page)
+        if len(page_options) < self.page_limit:
+            is_last_page = True
+        else:
+            is_last_page = False
+
+        self.add_objects_keyboard(builder, page_options, selected, page=page)
         builder.adjust(1)
+
         self.add_page_keyboard(builder, page, is_last_page)
         builder.row(self.return_button)
 
         return builder.as_markup()
+
+    @abstractmethod
+    async def load_options(
+        self, form_data: dict[str, Any], page: int, limit: int
+    ) -> Sequence[T]: ...
+
+
+@dataclasses.dataclass
+class StaticChoiceField[K](ChoiceField):
+    choices: dict[K, str] = dataclasses.field(kw_only=True)
+
+    _keys: list[K] = dataclasses.field(init=False)
+
+    option_to_button: Callable[[K], str] = dataclasses.field(init=False)
+    option_to_data: Callable[[K], K] = dataclasses.field(init=False)
+
+    def __post_init__(self):
+        self._keys = list(self.choices.keys())
+        self.option_to_button = lambda x: self.choices[x]
+        self.option_to_data = lambda x: x
+
+    async def load_options(self, form_data: dict[str, Any], page: int, limit: int):
+        return self._keys[page * self.page_limit : (page + 1) * self.page_limit]
 
 
 T = TypeVar("T")
@@ -159,28 +188,8 @@ class ObjectsLoader[T](Protocol):
 class DynamicChoiceField[T](ChoiceField):
     choices_loader: ObjectsLoader[T] = dataclasses.field(kw_only=True)
 
-    option_type: type[Any] = int
-    object_to_option: Callable[[T], Any] = repr
-    object_to_text: Callable[[T], str] = str
+    object_to_data: Callable[[T], Any] = repr
+    object_to_button: Callable[[T], str] = str
 
-    async def inline_markup(
-        self, form_data: dict[str, Any], page: int = 0
-    ) -> InlineKeyboardMarkup:
-        builder = InlineKeyboardBuilder()
-
-        selected: list[int] | None = form_data.get(self.name)
-        if selected is None:
-            selected = []
-
-        objects = await self.choices_loader(page=page, limit=self.page_limit + 1)
-        is_last_page = len(objects) < self.page_limit + 1
-        objects = objects[: self.page_limit]
-
-        items = {self.object_to_option(o): self.object_to_text(o) for o in objects}
-
-        self.add_objects_keyboard(builder, items, selected, page=page)
-        builder.adjust(1)
-        self.add_page_keyboard(builder, page, is_last_page)
-        builder.row(self.return_button)
-
-        return builder.as_markup()
+    async def load_options(self, form_data: dict[str, Any], page: int, limit: int):
+        return await self.choices_loader(limit=limit, page=page)

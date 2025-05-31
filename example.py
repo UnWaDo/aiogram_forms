@@ -108,8 +108,9 @@ register_user_form.add_field(
         button_text="🧑‍🏫 Choose your teachers",
         max_options=2,
         choices_loader=get_all_users,
-        object_to_option=lambda x: x["id"],
-        object_to_text=lambda x: x["name"],
+        option_to_data=lambda x: x["id"],
+        option_to_button=lambda x: x["name"],
+        option_data_type=int,
     )
 )
 
