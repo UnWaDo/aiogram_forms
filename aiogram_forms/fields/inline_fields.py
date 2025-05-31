@@ -39,7 +39,7 @@ class ChoiceField[T, K](InlineReplyField):
             value = self.option_to_data(option)
             text = self.option_to_button(option)
 
-            prefix = "✅ " if (option in selected) else ""
+            prefix = "✅ " if (value in selected) else ""
 
             builder.button(
                 text=f"{prefix}{text}",
@@ -188,8 +188,8 @@ class ObjectsLoader[T](Protocol):
 class DynamicChoiceField[T](ChoiceField):
     choices_loader: ObjectsLoader[T] = dataclasses.field(kw_only=True)
 
-    object_to_data: Callable[[T], Any] = repr
-    object_to_button: Callable[[T], str] = str
+    option_to_data: Callable[[T], Any] = repr
+    option_to_button: Callable[[T], str] = str
 
     async def load_options(self, form_data: dict[str, Any], page: int, limit: int):
         return await self.choices_loader(limit=limit, page=page)
