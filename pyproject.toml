@@ -1,0 +1,17 @@
+[build-system]
+requires = ["setuptools"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "aiogram_forms"
+version = "0.0.1"
+description = "A simple form builder for aiogram"
+readme = "README.md"
+requires-python = ">=3.8"
+license = {file = "LICENSE"}
+authors = [
+    {name = "unwado", email = "mezentsev.igor@gmail.com"},
+]
+
+[tool.setuptools.packages.find]
+where = ["."]
