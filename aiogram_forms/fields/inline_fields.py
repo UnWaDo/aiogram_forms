@@ -5,11 +5,18 @@ from typing import Any, Callable, Mapping, Protocol, Sequence, TypeVar
 from aiogram import F, Router
 from aiogram.filters.callback_data import CallbackData
 from aiogram.fsm.context import FSMContext
-from aiogram.types import CallbackQuery, InlineKeyboardMarkup, Message
+from aiogram.types import (
+    CallbackQuery,
+    InlineKeyboardMarkup,
+    Message,
+)
 from aiogram.utils.keyboard import InlineKeyboardBuilder
 
 from aiogram_forms.buttons import create_pagination_buttons
-from aiogram_forms.callbacks.factories import FormChoiceFieldCallback, FormPageCallback
+from aiogram_forms.callbacks.factories import (
+    FormChoiceFieldCallback,
+    FormPageCallback,
+)
 from aiogram_forms.fields.abstract_fields import InlineReplyField
 from aiogram_forms.utils import edit_message
 
@@ -114,6 +121,8 @@ class ChoiceField[T, K](InlineReplyField):
         await callback_query.answer()
 
     def assign_handlers(self, router: Router):
+        super().assign_handlers(router)
+
         router.callback_query.register(
             self.page_handler,
             FormPageCallback.filter(F.form_name == self.parent_form_name),
@@ -149,6 +158,10 @@ class ChoiceField[T, K](InlineReplyField):
         builder.adjust(1)
 
         self.add_page_keyboard(builder, page, is_last_page)
+
+        for action in self.additional_actions:
+            builder.row(action.button(self, form_data))
+
         builder.row(self.return_button)
 
         return builder.as_markup()
@@ -169,6 +182,8 @@ class StaticChoiceField[K](ChoiceField):
     option_to_data: Callable[[K], K] = dataclasses.field(init=False)
 
     def __post_init__(self):
+        super().__post_init__()
+
         self._keys = list(self.choices.keys())
         self.option_to_button = lambda x: self.choices[x]
         self.option_to_data = lambda x: x

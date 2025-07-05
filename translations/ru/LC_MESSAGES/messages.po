@@ -7,7 +7,7 @@ msgid ""
 msgstr ""
 "Project-Id-Version: PROJECT VERSION\n"
 "Report-Msgid-Bugs-To: EMAIL@ADDRESS\n"
-"POT-Creation-Date: 2025-05-31 08:48+0300\n"
+"POT-Creation-Date: 2025-07-05 12:19+0300\n"
 "PO-Revision-Date: 2025-05-31 08:54+0300\n"
 "Last-Translator: FULL NAME <EMAIL@ADDRESS>\n"
 "Language: ru\n"
@@ -19,16 +19,19 @@ msgstr ""
 "Content-Transfer-Encoding: 8bit\n"
 "Generated-By: Babel 2.17.0\n"
 
-#: aiogram_forms/buttons.py:13
+#: aiogram_forms/buttons.py:10
 msgid "🚫 Close"
 msgstr "🚫 Закрыть"
 
-#: aiogram_forms/fields/abstract_fields.py:166
+#: aiogram_forms/fields/abstract_fields.py:224
 msgid "⬅️ Back to menu"
 msgstr "⬅️ Назад в меню"
 
-#: aiogram_forms/modifiers/formatters.py:30
-#: aiogram_forms/modifiers/formatters.py:32
+#: aiogram_forms/fields/complex_fields.py:19
+msgid "🧹 Clear filter"
+msgstr "🧹 Очистить фильтр"
+
+#: aiogram_forms/modifiers/formatters.py:26
 msgid "😢 Text is missing"
 msgstr "😢 Текст отсутствует"
 

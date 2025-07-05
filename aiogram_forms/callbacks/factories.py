@@ -7,7 +7,14 @@ class FormFieldCallback(CallbackData, prefix="form"):
     field_name: str | None = None
 
 
-class FormChoiceFieldCallback(CallbackData, prefix="formfield"):
+class FormFieldActionCallback(CallbackData, prefix="formfieldaction"):
+    form_name: str
+    field_name: str
+    action: str
+    value: Any | None = None
+
+
+class FormChoiceFieldCallback(CallbackData, prefix="formfieldchoice"):
     form_name: str
     field_name: str
     data: Any

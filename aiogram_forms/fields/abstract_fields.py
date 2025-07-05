@@ -6,7 +6,7 @@ from typing import (
 )
 from gettext import gettext as _
 
-from aiogram import Router
+from aiogram import F, Router
 from aiogram.filters import Filter
 from aiogram.filters.callback_data import CallbackData
 from aiogram.fsm.context import FSMContext
@@ -21,7 +21,10 @@ from aiogram.types import (
 from aiogram.utils.keyboard import ReplyKeyboardBuilder
 from aiogram.utils.magic_filter import MagicFilter
 
-from aiogram_forms.callbacks.factories import FormFieldCallback
+from aiogram_forms.callbacks.factories import (
+    FormFieldActionCallback,
+    FormFieldCallback,
+)
 from aiogram_forms.modifiers.formatters import MessageFormatter
 from aiogram_forms.modifiers.validators import MessageValidator
 from aiogram_forms.modifiers.visibles import FieldVisible
@@ -99,8 +102,46 @@ class MessageReplyField(FormField):
         return markup
 
 
+class Action:
+    name: str
+    button_text: str
+
+    @abstractmethod
+    async def __call__(
+        self, field: FormField, form_data: dict[str, Any], value: Any | None = None
+    ) -> Any: ...
+
+    def prepare_value(self, field: FormField, form_data: dict[str, Any]):
+        return None
+
+    def callback_data(self, field: FormField, form_data: dict[str, Any]):
+        return FormFieldActionCallback(
+            form_name=field.parent_form_name,
+            field_name=field.name,
+            action=self.name,
+            value=self.prepare_value(field, form_data),
+        ).pack()
+
+    def button(self, field: FormField, form_data: dict[str, Any]):
+        return InlineKeyboardButton(
+            text=self.button_text,
+            callback_data=self.callback_data(field, form_data),
+        )
+
+
 @dataclasses.dataclass
 class InlineReplyField(FormField):
+    additional_actions: list[Action] = dataclasses.field(
+        kw_only=True, default_factory=list
+    )
+
+    _additional_actions: dict[str, Action] = dataclasses.field(init=False)
+
+    def __post_init__(self):
+        self._additional_actions = {
+            action.name: action for action in self.additional_actions
+        }
+
     @abstractmethod
     async def field_action(
         self, callback_data: CallbackData, form_data: dict[str, Any]
@@ -133,7 +174,17 @@ class InlineReplyField(FormField):
             raise ValueError("callback_query does not have message")
 
         form_data = await self.get_parent_form_data(state)
-        await self.field_action(callback_data, form_data)
+
+        if isinstance(callback_data, FormFieldActionCallback):
+            action = self._additional_actions.get(callback_data.action)
+            if action is None:
+                raise ValueError(f"Action {callback_data.action} is not registered")
+
+            await action(self, form_data, callback_data.value)
+
+        else:
+            await self.field_action(callback_data, form_data)
+
         await self.update_parent_form_data(state, form_data)
 
         if self.prompt_formatter is None:
@@ -160,14 +211,19 @@ class InlineReplyField(FormField):
         )
         await callback_query.answer()
 
+    def assign_handlers(self, router: Router):
+        router.callback_query.register(
+            self.inline_handler,
+            FormFieldActionCallback.filter(F.form_name == self.parent_form_name),
+            FormFieldActionCallback.filter(F.field_name == self.name),
+        )
+
     @property
     def return_button(self):
         return InlineKeyboardButton(
             text=_("⬅️ Back to menu"),
             callback_data=FormFieldCallback(
                 form_name=self.parent_form_name,
-                field_name=self.parent_form_name,
+                field_name=None,
             ).pack(),
         )
-
-    def assign_handlers(self, router: Router): ...

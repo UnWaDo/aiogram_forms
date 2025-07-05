@@ -1,6 +1,7 @@
 import logging
 
 from aiogram import Bot
+from aiogram.exceptions import TelegramBadRequest
 from aiogram.types import InlineKeyboardMarkup
 
 logger = logging.getLogger(__name__)
@@ -31,6 +32,14 @@ async def edit_message(
                 reply_markup=inline_markup,
             )
         return True
+    except TelegramBadRequest as e:
+        if (
+            e.message
+            == "Bad Request: message is not modified: specified new message content and reply markup are exactly the same as a current content and reply markup of the message"
+        ):
+            return True
+        logger.warning(f"Exception {e} raised when editing message")
+
     except Exception as e:
         logger.warning(f"Exception {e} raised when editing message")
 

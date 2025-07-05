@@ -236,6 +236,7 @@ class FormBuilder:
             router.callback_query.register(
                 inline_handler,
                 FormFieldCallback.filter(F.form_name == self.name),
+                FormFieldCallback.filter(F.field_name.is_(None)),
             )
         else:
             router.message.register(
@@ -255,7 +256,7 @@ class FormBuilder:
         router.callback_query.register(
             inline_handler,
             FormFieldCallback.filter(F.form_name == self.name),
-            FormFieldCallback.filter(F.field_name == self.name),
+            FormFieldCallback.filter(F.field_name.is_(None)),
         )
 
     def _form_close_handler(self, router: Router):

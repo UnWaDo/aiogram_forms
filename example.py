@@ -6,6 +6,7 @@ from aiogram import Bot, Dispatcher, Router
 
 from aiogram_forms.builder import FormBuilder
 from aiogram_forms.fields.click_fields import SubmitField, ToggleField, ToggleManyField
+from aiogram_forms.fields.complex_fields import DynamicChoiceFieldWithStringFilter
 from aiogram_forms.fields.inline_fields import DynamicChoiceField, StaticChoiceField
 from aiogram_forms.fields.message_fields import MultiStringField, StringField
 from aiogram_forms.modifiers.formatters import FixedTextFormatter
@@ -115,6 +116,32 @@ register_user_form.add_field(
 )
 
 
+async def get_companies(filter_str: str | None, limit: int = 5, page: int = 0):
+    names = ["Apple", "Google", "Microsoft", "X", "Amazon", "Samsung", "Maven"]
+    companies = [(i, name) for i, name in enumerate(names)]
+
+    if filter_str is None:
+        return companies[page * limit : (page + 1) * limit]
+
+    selected = list(filter(lambda x: filter_str in x[1], companies))
+    return selected[page * limit : (page + 1) * limit]
+
+
+register_user_form.add_field(
+    DynamicChoiceFieldWithStringFilter(
+        name="company_name",
+        visible=[RequireValueVisible("work_type", lambda x: x == "business")],
+        button_text="🏢 Choose your company",
+        choices_loader=get_companies,
+        option_to_data=lambda x: x[0],
+        option_to_button=lambda x: x[1],
+        option_data_type=int,
+        prompt_formatter=FixedTextFormatter(
+            text='Specify your company. Type anything to filter the companies listed. Press "Clear" to clear the filter'
+        ),
+    )
+)
+
 register_user_form.add_field(
     ToggleField(
         name="agree",
@@ -154,6 +181,13 @@ register_user_form.add_field(
                 lambda data: (
                     bool(data.get("work_place"))
                     if data.get("work_type") == "science"
+                    else True
+                )
+            ),
+            FormConditionVisible(
+                lambda data: (
+                    bool(data.get("company_name"))
+                    if data.get("work_type") == "business"
                     else True
                 )
             ),
