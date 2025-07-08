@@ -95,11 +95,13 @@ register_user_form.add_field(
 )
 
 
-async def get_all_users(limit: int = 5, page: int = 0):
+async def get_all_users(
+    form_data: dict[str, Any], offset: int = 0, limit: int = 5, **kwargs
+):
     names = ["John", "Mary", "Kate", "Margo", "Liza", "Anna", "Alex", "Bob"]
     teachers = [{"id": i, "name": name} for i, name in enumerate(names)]
 
-    return teachers[page * limit : (page + 1) * limit]
+    return teachers[offset : offset + limit]
 
 
 register_user_form.add_field(
@@ -116,15 +118,21 @@ register_user_form.add_field(
 )
 
 
-async def get_companies(filter_str: str | None, limit: int = 5, page: int = 0):
+async def get_companies(
+    form_data: dict[str, Any],
+    filter_str: str | None,
+    offset: int = 0,
+    limit: int = 5,
+    **kwargs,
+):
     names = ["Apple", "Google", "Microsoft", "X", "Amazon", "Samsung", "Maven"]
     companies = [(i, name) for i, name in enumerate(names)]
 
     if filter_str is None:
-        return companies[page * limit : (page + 1) * limit]
+        return companies[offset : offset + limit]
 
     selected = list(filter(lambda x: filter_str in x[1], companies))
-    return selected[page * limit : (page + 1) * limit]
+    return selected[offset : offset + limit]
 
 
 register_user_form.add_field(
@@ -157,8 +165,9 @@ register_user_form.add_field(
 )
 
 
-async def register_user(form_data: dict[str, Any]):
+async def register_user(form_data: dict[str, Any], **kwargs):
     print(form_data)
+    print(kwargs)
 
 
 register_user_form.add_field(

@@ -73,18 +73,20 @@ class FormBuilder:
 
         return form_data
 
-    async def _menu_keyboard(self, form_data: dict[str, Any]) -> InlineKeyboardMarkup:
+    async def _menu_keyboard(
+        self, form_data: dict[str, Any], **kwargs
+    ) -> InlineKeyboardMarkup:
         builder = InlineKeyboardBuilder()
 
         for name, field in self._fields.items():
 
-            if not all(visible(form_data) for visible in field.visible):
+            if not all(visible(form_data, **kwargs) for visible in field.visible):
                 continue
 
             if isinstance(field.button_text, str):
                 button_text = field.button_text
             else:
-                button_text = await field.button_text(form_data)
+                button_text = await field.button_text(form_data, **kwargs)
 
             builder.button(
                 text=button_text,
@@ -98,21 +100,12 @@ class FormBuilder:
 
         return builder.as_markup()
 
-    async def _field_keyboard(
-        self, state: FSMContext, field: FormField
-    ) -> InlineKeyboardMarkup | None:
-
-        if not isinstance(field, InlineReplyField):
-            return None
-
-        form_data = await self.get_form_data(state)
-        return await field.inline_markup(form_data)
-
     async def update_root_message(
         self,
         state: FSMContext,
         event_message: Message,
         field: FormField | None = None,
+        **kwargs,
     ):
         form_data = await self.get_form_data(state)
 
@@ -120,18 +113,18 @@ class FormBuilder:
         reply_markup = None
 
         if field is None or field.prompt_formatter is None:
-            text = await self.menu_message(form_data)
+            text = await self.menu_message(form_data, **kwargs)
         else:
-            text = await field.prompt_formatter(form_data)
+            text = await field.prompt_formatter(form_data, **kwargs)
 
         if field is None:
-            inline_markup = await self._menu_keyboard(form_data)
+            inline_markup = await self._menu_keyboard(form_data, **kwargs)
 
         elif isinstance(field, InlineReplyField):
-            inline_markup = await field.inline_markup(form_data)
+            inline_markup = await field.inline_markup(form_data, **kwargs)
 
         elif isinstance(field, MessageReplyField) and field.text_hints:
-            reply_markup = await field.reply_markup(form_data)
+            reply_markup = await field.reply_markup(form_data, **kwargs)
 
         chat_id = event_message.chat.id
         bot = event_message.bot
@@ -188,14 +181,16 @@ class FormBuilder:
         await state.update_data({self.name: data})
 
     def _create_click_handler(self, field: FormField):
-        async def click_handler(callback_query: CallbackQuery, state: FSMContext):
+        async def click_handler(
+            callback_query: CallbackQuery, state: FSMContext, **kwargs
+        ):
             message = callback_query.message
             if not isinstance(message, Message):
                 raise ValueError("callback_query does not have message")
 
             form_data = await self.get_form_data(state)
             if isinstance(field, ClickHandler):
-                await field.handle_click(form_data)
+                await field.handle_click(form_data, **kwargs)
                 await self.update_form_data(state=state, data=form_data)
 
                 await self.update_root_message(state=state, event_message=message)
@@ -205,7 +200,7 @@ class FormBuilder:
                 await state.set_state(self._states[field.name])
 
             await self.update_root_message(
-                field=field, state=state, event_message=message
+                field=field, state=state, event_message=message, **kwargs
             )
             await callback_query.answer()
 
@@ -219,18 +214,20 @@ class FormBuilder:
                 await state.update_data({self.root_message_name: None})
                 await self.update_form_data(state, self.initial_form_data)
 
-        async def inline_handler(callback_query: CallbackQuery, state: FSMContext):
+        async def inline_handler(
+            callback_query: CallbackQuery, state: FSMContext, **kwargs
+        ):
             message = callback_query.message
             if not isinstance(message, Message):
                 raise ValueError("callback_query does not have message")
 
             await general_action(state)
-            await self.update_root_message(state=state, event_message=message)
+            await self.update_root_message(state=state, event_message=message, **kwargs)
             await callback_query.answer()
 
-        async def message_handler(message: Message, state: FSMContext):
+        async def message_handler(message: Message, state: FSMContext, **kwargs):
             await general_action(state)
-            await self.update_root_message(state=state, event_message=message)
+            await self.update_root_message(state=state, event_message=message, **kwargs)
 
         if command_init is None:
             router.callback_query.register(
@@ -245,12 +242,14 @@ class FormBuilder:
             )
 
     def _form_menu_handler(self, router: Router):
-        async def inline_handler(callback_query: CallbackQuery, state: FSMContext):
+        async def inline_handler(
+            callback_query: CallbackQuery, state: FSMContext, **kwargs
+        ):
             message = callback_query.message
             if not isinstance(message, Message):
                 raise ValueError("callback_query does not have message")
 
-            await self.update_root_message(state=state, event_message=message)
+            await self.update_root_message(state=state, event_message=message, **kwargs)
             await callback_query.answer()
 
         router.callback_query.register(
@@ -260,7 +259,9 @@ class FormBuilder:
         )
 
     def _form_close_handler(self, router: Router):
-        async def close_handler(callback_query: CallbackQuery, state: FSMContext):
+        async def close_handler(
+            callback_query: CallbackQuery, state: FSMContext, **kwargs
+        ):
             message = callback_query.message
             if not isinstance(message, Message):
                 raise ValueError("callback_query does not have message")
@@ -310,11 +311,11 @@ class FormBuilder:
                 field.assign_handlers(router)
 
     def _create_message_field_handler(self, field: MessageReplyField):
-        async def message_handler(message: Message, state: FSMContext):
+        async def message_handler(message: Message, state: FSMContext, **kwargs):
             form_data = await self.get_form_data(state)
 
-            if await field.validate_message(message, form_data):
-                await field.handle_message(message, form_data, state)
+            if await field.validate_message(message, form_data, **kwargs):
+                await field.handle_message(message, form_data, state, **kwargs)
 
             to_menu = (await state.get_state()) is None
 
@@ -323,6 +324,7 @@ class FormBuilder:
                 field=None if to_menu else field,
                 state=state,
                 event_message=message,
+                **kwargs,
             )
 
         return message_handler

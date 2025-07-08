@@ -1,10 +1,7 @@
 from abc import ABC, abstractmethod
 import dataclasses
-from typing import (
-    Any,
-    Sequence,
-)
 from gettext import gettext as _
+from typing import Any, Sequence
 
 from aiogram import F, Router
 from aiogram.filters import Filter
@@ -21,10 +18,7 @@ from aiogram.types import (
 from aiogram.utils.keyboard import ReplyKeyboardBuilder
 from aiogram.utils.magic_filter import MagicFilter
 
-from aiogram_forms.callbacks.factories import (
-    FormFieldActionCallback,
-    FormFieldCallback,
-)
+from aiogram_forms.callbacks.factories import FormFieldActionCallback, FormFieldCallback
 from aiogram_forms.modifiers.formatters import MessageFormatter
 from aiogram_forms.modifiers.validators import MessageValidator
 from aiogram_forms.modifiers.visibles import FieldVisible
@@ -59,7 +53,7 @@ class MessageReplyField(FormField):
         self.fsm_state = State(self.name)
 
     async def handle_message(
-        self, message: Message, form_data: dict[str, Any], state: FSMContext
+        self, message: Message, form_data: dict[str, Any], state: FSMContext, **kwargs
     ):
         if self.one_time_state:
             await state.set_state(None)
@@ -75,16 +69,16 @@ class MessageReplyField(FormField):
             )
 
     async def validate_message(
-        self, message: Message, form_data: dict[str, Any]
+        self, message: Message, form_data: dict[str, Any], **kwargs
     ) -> bool:
         for validator in self.validators:
-            if not validator(message, form_data):
+            if not validator(message, form_data, **kwargs):
                 return False
 
         return True
 
     async def reply_markup(
-        self, form_data: dict[str, Any]
+        self, form_data: dict[str, Any], **kwargs
     ) -> ReplyKeyboardMarkup | None:
 
         if not self.text_hints:
@@ -108,24 +102,28 @@ class Action:
 
     @abstractmethod
     async def __call__(
-        self, field: FormField, form_data: dict[str, Any], value: Any | None = None
+        self,
+        field: FormField,
+        form_data: dict[str, Any],
+        value: Any | None = None,
+        **kwargs,
     ) -> Any: ...
 
-    def prepare_value(self, field: FormField, form_data: dict[str, Any]):
+    def prepare_value(self, field: FormField, form_data: dict[str, Any], **kwargs):
         return None
 
-    def callback_data(self, field: FormField, form_data: dict[str, Any]):
+    def callback_data(self, field: FormField, form_data: dict[str, Any], **kwargs):
         return FormFieldActionCallback(
             form_name=field.parent_form_name,
             field_name=field.name,
             action=self.name,
-            value=self.prepare_value(field, form_data),
+            value=self.prepare_value(field, form_data, **kwargs),
         ).pack()
 
-    def button(self, field: FormField, form_data: dict[str, Any]):
+    def button(self, field: FormField, form_data: dict[str, Any], **kwargs):
         return InlineKeyboardButton(
             text=self.button_text,
-            callback_data=self.callback_data(field, form_data),
+            callback_data=self.callback_data(field, form_data, **kwargs),
         )
 
 
@@ -144,12 +142,12 @@ class InlineReplyField(FormField):
 
     @abstractmethod
     async def field_action(
-        self, callback_data: CallbackData, form_data: dict[str, Any]
+        self, callback_data: CallbackData, form_data: dict[str, Any], **kwargs
     ): ...
 
     @abstractmethod
     async def inline_markup(
-        self, form_data: dict[str, Any], page: int = 0
+        self, form_data: dict[str, Any], page: int = 0, **kwargs
     ) -> InlineKeyboardMarkup: ...
 
     async def get_parent_form_data(self, state: FSMContext) -> dict[str, Any]:
@@ -180,24 +178,24 @@ class InlineReplyField(FormField):
             if action is None:
                 raise ValueError(f"Action {callback_data.action} is not registered")
 
-            await action(self, form_data, callback_data.value)
+            await action(self, form_data, callback_data.value, **kwargs)
 
         else:
-            await self.field_action(callback_data, form_data)
+            await self.field_action(callback_data, form_data, **kwargs)
 
         await self.update_parent_form_data(state, form_data)
 
         if self.prompt_formatter is None:
             text = None
         else:
-            text = await self.prompt_formatter(form_data)
+            text = await self.prompt_formatter(form_data, **kwargs)
 
         if hasattr(callback_data, "current_page"):
             page = getattr(callback_data, "current_page")
         else:
             page = 0
 
-        keyboard = await self.inline_markup(form_data, page=page)
+        keyboard = await self.inline_markup(form_data, page=page, **kwargs)
 
         if message.bot is None:
             raise ValueError("Bot is not attached to message")

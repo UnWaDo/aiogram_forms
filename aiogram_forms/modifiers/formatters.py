@@ -8,14 +8,14 @@ import jinja2
 
 class MessageFormatter(ABC):
     @abstractmethod
-    async def __call__(self, form_data: dict[str, Any]) -> str: ...
+    async def __call__(self, form_data: dict[str, Any], **kwargs) -> str: ...
 
 
 @dataclasses.dataclass
 class FixedTextFormatter(MessageFormatter):
     text: str
 
-    async def __call__(self, form_data: dict[str, Any]) -> str:
+    async def __call__(self, form_data: dict[str, Any], **kwargs) -> str:
         return self.text
 
 
@@ -25,7 +25,7 @@ class ConditionalMessageFormatter(MessageFormatter):
     options: dict[Hashable, str]
     default_text: str = _("😢 Text is missing")
 
-    async def __call__(self, form_data: dict[str, Any]) -> str:
+    async def __call__(self, form_data: dict[str, Any], **kwargs) -> str:
         value = form_data.get(self.value_name)
         if value is None:
             return self.default_text
@@ -34,7 +34,7 @@ class ConditionalMessageFormatter(MessageFormatter):
 
 
 class FormDataFormatter(MessageFormatter):
-    async def __call__(self, form_data: dict[str, Any]) -> str:
+    async def __call__(self, form_data: dict[str, Any], **kwargs) -> str:
         return str(form_data)
 
 
@@ -43,7 +43,7 @@ class JinjaFormatter(MessageFormatter):
     template: str
     extra_values: dict[str, Any] = dataclasses.field(default_factory=dict)
 
-    async def __call__(self, form_data: dict[str, Any]) -> str:
+    async def __call__(self, form_data: dict[str, Any], **kwargs) -> str:
         return jinja2.Template(self.template).render(
             **{**self.extra_values, **form_data}
         )

@@ -17,15 +17,15 @@ class StringField(MessageReplyField):
     )
 
     async def handle_message(
-        self, message: Message, form_data: dict[str, Any], state: FSMContext
+        self, message: Message, form_data: dict[str, Any], state: FSMContext, **kwargs
     ):
-        await super().handle_message(message, form_data, state)
+        await super().handle_message(message, form_data, state, **kwargs)
         if message.text is None:
             return
 
-        await self.handle_text(message.text, form_data)
+        await self.handle_text(message.text, form_data, **kwargs)
 
-    async def handle_text(self, text: str, form_data: dict[str, Any]):
+    async def handle_text(self, text: str, form_data: dict[str, Any], **kwargs):
         form_data[self.name] = text
 
 
@@ -44,9 +44,11 @@ class MultiStringField(StringField):
             self.text_hints = [self.clear_message, self.end_of_input_message]
 
     async def handle_message(
-        self, message: Message, form_data: dict[str, Any], state: FSMContext
+        self, message: Message, form_data: dict[str, Any], state: FSMContext, **kwargs
     ):
-        await super(StringField, self).handle_message(message, form_data, state)
+        await super(StringField, self).handle_message(
+            message, form_data, state, **kwargs
+        )
 
         if message.text is None:
             return
@@ -69,7 +71,7 @@ class MultiStringField(StringField):
 
         await self.handle_text(message.text, form_data)
 
-    async def handle_text(self, text: str, form_data: dict[str, Any]):
+    async def handle_text(self, text: str, form_data: dict[str, Any], **kwargs):
         if form_data.get(self.name) is None:
             form_data[self.name] = []
 

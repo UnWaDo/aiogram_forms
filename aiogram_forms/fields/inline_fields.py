@@ -1,22 +1,15 @@
 from abc import abstractmethod
 import dataclasses
-from typing import Any, Callable, Mapping, Protocol, Sequence, TypeVar
+from typing import Any, Callable, Protocol, Sequence, TypeVar
 
 from aiogram import F, Router
 from aiogram.filters.callback_data import CallbackData
 from aiogram.fsm.context import FSMContext
-from aiogram.types import (
-    CallbackQuery,
-    InlineKeyboardMarkup,
-    Message,
-)
+from aiogram.types import CallbackQuery, InlineKeyboardMarkup, Message
 from aiogram.utils.keyboard import InlineKeyboardBuilder
 
 from aiogram_forms.buttons import create_pagination_buttons
-from aiogram_forms.callbacks.factories import (
-    FormChoiceFieldCallback,
-    FormPageCallback,
-)
+from aiogram_forms.callbacks.factories import FormChoiceFieldCallback, FormPageCallback
 from aiogram_forms.fields.abstract_fields import InlineReplyField
 from aiogram_forms.utils import edit_message
 
@@ -72,7 +65,7 @@ class ChoiceField[T, K](InlineReplyField):
         )
 
     async def field_action(
-        self, callback_data: CallbackData, form_data: dict[str, Any]
+        self, callback_data: CallbackData, form_data: dict[str, Any], **kwargs
     ):
         if not isinstance(callback_data, FormChoiceFieldCallback):
             raise ValueError("callback_data is not FormChoiceFieldCallback")
@@ -100,13 +93,16 @@ class ChoiceField[T, K](InlineReplyField):
         callback_query: CallbackQuery,
         callback_data: FormPageCallback,
         state: FSMContext,
+        **kwargs,
     ):
         message = callback_query.message
         if not isinstance(message, Message):
             raise ValueError("callback_query does not have message")
 
         form_data = await self.get_parent_form_data(state)
-        keyboard = await self.inline_markup(form_data, page=callback_data.page)
+        keyboard = await self.inline_markup(
+            form_data, page=callback_data.page, **kwargs
+        )
 
         if message.bot is None:
             raise ValueError("Bot is not attached to message")
@@ -135,7 +131,7 @@ class ChoiceField[T, K](InlineReplyField):
         )
 
     async def inline_markup(
-        self, form_data: dict[str, Any], page: int = 0
+        self, form_data: dict[str, Any], page: int = 0, **kwargs
     ) -> InlineKeyboardMarkup:
         builder = InlineKeyboardBuilder()
 
@@ -145,14 +141,16 @@ class ChoiceField[T, K](InlineReplyField):
 
         page_options = await self.load_options(
             form_data,
-            page=page,
+            offset=page * self.page_limit,
             limit=self.page_limit + 1,
+            **kwargs,
         )
 
-        if len(page_options) < self.page_limit:
+        if len(page_options) <= self.page_limit:
             is_last_page = True
         else:
             is_last_page = False
+            page_options = page_options[: self.page_limit]
 
         self.add_objects_keyboard(builder, page_options, selected, page=page)
         builder.adjust(1)
@@ -168,7 +166,7 @@ class ChoiceField[T, K](InlineReplyField):
 
     @abstractmethod
     async def load_options(
-        self, form_data: dict[str, Any], page: int, limit: int
+        self, form_data: dict[str, Any], offset: int, limit: int, **kwargs
     ) -> Sequence[T]: ...
 
 
@@ -188,15 +186,19 @@ class StaticChoiceField[K](ChoiceField):
         self.option_to_button = lambda x: self.choices[x]
         self.option_to_data = lambda x: x
 
-    async def load_options(self, form_data: dict[str, Any], page: int, limit: int):
-        return self._keys[page * self.page_limit : (page + 1) * self.page_limit]
+    async def load_options(
+        self, form_data: dict[str, Any], offset: int, limit: int, **kwargs
+    ):
+        return self._keys[offset : offset + limit]
 
 
 T = TypeVar("T")
 
 
 class ObjectsLoader[T](Protocol):
-    async def __call__(self, limit: int = 5, page: int = 0) -> Sequence[T]: ...
+    async def __call__(
+        self, form_data: dict[str, Any], offset: int = 0, limit: int = 5, **kwargs
+    ) -> Sequence[T]: ...
 
 
 @dataclasses.dataclass
@@ -206,5 +208,9 @@ class DynamicChoiceField[T](ChoiceField):
     option_to_data: Callable[[T], Any] = repr
     option_to_button: Callable[[T], str] = str
 
-    async def load_options(self, form_data: dict[str, Any], page: int, limit: int):
-        return await self.choices_loader(limit=limit, page=page)
+    async def load_options(
+        self, form_data: dict[str, Any], offset: int, limit: int, **kwargs
+    ):
+        return await self.choices_loader(
+            form_data=form_data, offset=offset, limit=limit, **kwargs
+        )
